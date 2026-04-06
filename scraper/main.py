@@ -115,10 +115,12 @@ def extract(title):
 info = []
 for i in range(1, 251):
     url = "https://mydramalist.com/shows/top?page=" + str(i)
-    driver.get(url)
-    big_html = driver.page_source
-    soup = BeautifulSoup(big_html, "lxml")
-    shows = soup.select(".text-primary.title")
+    shows = []
+    while (len(shows) == 0):
+        driver.get(url)
+        big_html = driver.page_source
+        soup = BeautifulSoup(big_html, "lxml")
+        shows = soup.select(".text-primary.title")
     for show in shows:
         ctr += 1
         show = show.a
