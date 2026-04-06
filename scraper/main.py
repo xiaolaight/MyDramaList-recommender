@@ -7,6 +7,7 @@ import pandas as pd
 ctr = 0
 options = Options()
 options.add_argument("user-agent=laightly")
+# uncomment below line to optimize the webscraping process but lose ability to see the driver window
 # options.add_argument("--headless=new")
 options.page_load_strategy = 'normal'
 mp = {}
