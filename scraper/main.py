@@ -1,50 +1,71 @@
 from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import pandas as pd
 
 ctr = 0
 options = Options()
-options.add_argument("user-agent=laight")
+options.add_argument("user-agent=laightly")
 options.add_argument("--headless=new")
 options.page_load_strategy = 'normal'
+mp = {}
 driver = webdriver.Chrome(options=options)
+wait = WebDriverWait(driver, 10)
 
-# consider all genres
-def getGenre(soup):
+# consider three most dominant genres
+def getGenres(soup):
     genres = [x.get_text(strip=True) for x in soup.select("li.show-genres a")]
     if len(genres) > 3:
         return genres[:3]
+    if (len(genres) == 0):
+        return -1
     return genres
 
-# extract keywords from description
+# extract three most popular keywords from tags
 def getTags(soup):
     tags = [x.get_text(strip=True) for x in soup.select("li.show-tags a")]
     if len(tags) > 3:
         return tags[:3]
+    if (len(tags) == 0):
+        return -1
     return tags
 
-# take in director, screenwriter
+# take in all directors and screenwriters
 def getCrew(soup):
-    director = soup.select_one("li:has(b:-soup-contains('Director')) a").get_text(strip=True)
-    screenwriter = soup.select_one("li:has(b:-soup-contains('Screenwriter')) a").get_text(strip=True)
+    try:
+        director = [x.get_text(strip=True) for x in soup.select("li:has(b:-soup-contains('Director')) a")]
+    except:
+        director = []
+    try:
+        screenwriter = [x.get_text(strip=True) for x in soup.select("li:has(b:-soup-contains('Screenwriter')) a")]
+    except:
+        screenwriter = director
     return [director, screenwriter]
 
-# take in three most popular actors (so should be two leads and considering one support lead)
+# take in top three actors (so should be two leads and considering one support lead)
 def getLeads(soup):
     leads = [x.get_text(strip=True) for x in soup.find_all("b", attrs={'itempropx': "name"})]
     if len(leads) < 3:
         return leads
+    if (len(leads) == 0):
+        return -1
     return [leads[0], leads[1], leads[2]]
 
-# main control loop
+# webscraper control function for each individual drama
 def extract(title):
     ret = [title]
     html = driver.page_source
     lil_soup = BeautifulSoup(html, "lxml")
     while True:
         try:
-            ret.append(getGenre(lil_soup))
+            cur = getGenres(lil_soup)
+            if (cur == -1):
+                driver.refresh()
+                html = driver.page_source
+                lil_soup = (html, "lxml")
+                continue
+            ret.append(cur)
             break
         except:
             driver.refresh()
@@ -52,7 +73,13 @@ def extract(title):
             lil_soup = BeautifulSoup(html, "lxml")
     while True:
         try:
-            ret.append(getTags(lil_soup))
+            cur = getTags(lil_soup)
+            if (cur == -1):
+                driver.refresh()
+                html = driver.page_source
+                lil_soup = (html, "lxml")
+                continue
+            ret.append(cur)
             break
         except:
             driver.refresh()
@@ -70,7 +97,13 @@ def extract(title):
             lil_soup = BeautifulSoup(html, "lxml")
     while True:
         try:
-            ret.append(getLeads(lil_soup))
+            cur = getLeads(lil_soup)
+            if (cur == -1):
+                driver.refresh()
+                html = driver.page_source
+                lil_soup = (html, "lxml")
+                continue
+            ret.append(cur)
             break
         except:
             driver.refresh()
@@ -78,8 +111,7 @@ def extract(title):
             lil_soup = BeautifulSoup(html, "lxml")
     return ret
 
-# it can be helpful to batch the scraping because selenium is slow by nature, making the entire scraping process run for ~45 minutes
-# can also add print line as checkpoint if desired
+# a full run could take more than an hour, so splitting them up into batches could be an option you consider.
 info = []
 for i in range(1, 251):
     url = "https://mydramalist.com/shows/top?page=" + str(i)
@@ -93,7 +125,8 @@ for i in range(1, 251):
         link = "https://mydramalist.com/" + show["href"]
         driver.get(link)
         info.append(extract(show.string))
+    print(i)
 
+# export to drama_data.csv, or any filepath you would like to choose
 df = pd.DataFrame(info, columns=["Title", "Genres", "Tags", "Director", "Screenwriter", "Actors"])
-filepath = 'drama_data.csv' # update as fit
-df.to_csv(filepath, index=False)
+df.to_csv('drama_data.csv', index=False)
