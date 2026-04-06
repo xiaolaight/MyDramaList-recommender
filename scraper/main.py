@@ -7,7 +7,7 @@ import pandas as pd
 ctr = 0
 options = Options()
 options.add_argument("user-agent=laightly")
-options.add_argument("--headless=new")
+# options.add_argument("--headless=new")
 options.page_load_strategy = 'normal'
 mp = {}
 driver = webdriver.Chrome(options=options)
@@ -115,9 +115,12 @@ def extract(title):
 info = []
 for i in range(1, 251):
     url = "https://mydramalist.com/shows/top?page=" + str(i)
-    shows = []
-    while (len(shows) == 0):
-        driver.get(url)
+    driver.get(url)
+    big_html = driver.page_source
+    soup = BeautifulSoup(big_html, "lxml")
+    shows = soup.select(".text-primary.title")
+    while len(shows) == 0:
+        driver.refresh()
         big_html = driver.page_source
         soup = BeautifulSoup(big_html, "lxml")
         shows = soup.select(".text-primary.title")
