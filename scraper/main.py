@@ -53,6 +53,11 @@ def getLeads(soup):
         return -1
     return [leads[0], leads[1], leads[2]]
 
+def getImg(soup):
+    link = soup.find("link", {"rel": "image_src"})
+    img_url = link["href"]
+    return [img_url]
+
 # webscraper control function for each individual drama
 def extract(title):
     ret = [title]
@@ -110,6 +115,15 @@ def extract(title):
             driver.refresh()
             html = driver.page_source
             lil_soup = BeautifulSoup(html, "lxml")
+    while True:
+        try:
+            cur = getImg(lil_soup)
+            ret.append(cur)
+            break
+        except:
+            driver.refresh()
+            html = driver.page_source
+            lil_soup = BeautifulSoup(html, "lxml")
     return ret
 
 # a full run could take more than an hour, so splitting them up into batches could be an option you consider.
@@ -134,5 +148,5 @@ for i in range(1, 251):
     print(i)
 
 # export to drama_data.csv, or any filepath you would like to choose
-df = pd.DataFrame(info, columns=["Title", "Genres", "Tags", "Director", "Screenwriter", "Actors"])
+df = pd.DataFrame(info, columns=["Title", "Genres", "Tags", "Director", "Screenwriter", "Actors", "url"])
 df.to_csv('drama_data.csv', index=False)
