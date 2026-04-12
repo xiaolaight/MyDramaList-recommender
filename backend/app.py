@@ -144,6 +144,21 @@ def add_watch(body: WatchBody):
     }
 
 
+@app.post("/api/watch/remove")
+def remove_watch(body: WatchBody):
+    info = verify_credential(body.credential)
+    sub = info.get("sub")
+    if not sub:
+        raise HTTPException(status_code=401, detail="Token missing sub")
+    if not db.user_exists(sub):
+        raise HTTPException(status_code=404, detail="User not registered")
+    comp_one, comp_two = db.rem_watch(sub, body.drama_id)
+    return {
+        "watched": rows_to_payload(comp_one),
+        "recommendations": rows_to_payload(comp_two),
+    }
+
+
 if __name__ == "__main__":
     # API on 8000 so Vite (5173) can proxy /api here. Run: python app.py from backend/
     uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)

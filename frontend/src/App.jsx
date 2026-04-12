@@ -21,6 +21,27 @@ async function apiJson(path, body) {
   return data;
 }
 
+function TrashIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
 function DramaGrid({ items, emptyLabel }) {
   if (!items?.length) {
     return (
@@ -43,6 +64,56 @@ function DramaGrid({ items, emptyLabel }) {
               className="h-full w-full object-cover"
               loading="lazy"
             />
+          </div>
+          <p className="p-3 text-sm font-medium leading-snug text-slate-100">
+            {d.title}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function WatchedDramaGrid({ items, emptyLabel, disabled, onRemove }) {
+  if (!items?.length) {
+    return (
+      <p className="rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-8 text-center text-sm text-slate-500">
+        {emptyLabel}
+      </p>
+    );
+  }
+  return (
+    <ul className="grid gap-4 sm:grid-cols-2">
+      {items.map((d) => (
+        <li
+          key={d.id}
+          className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/80 shadow-lg shadow-slate-950/40"
+        >
+          <div className="group relative aspect-[2/3] w-full overflow-hidden bg-slate-800">
+            <img
+              src={d.pic_url}
+              alt=""
+              className="h-full w-full object-cover transition duration-200 group-hover:brightness-[0.55]"
+              loading="lazy"
+            />
+            <div
+              className="pointer-events-none absolute inset-0 bg-rose-600/0 transition-colors duration-200 group-hover:bg-rose-600/35"
+              aria-hidden
+            />
+            <button
+              type="button"
+              disabled={disabled}
+              aria-label={`Remove ${d.title} from watched`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(d.id);
+              }}
+              className="absolute inset-0 z-10 flex cursor-pointer items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-0"
+            >
+              <span className="rounded-full bg-rose-950/90 p-3 text-white shadow-lg ring-2 ring-rose-400/60">
+                <TrashIcon className="h-8 w-8" />
+              </span>
+            </button>
           </div>
           <p className="p-3 text-sm font-medium leading-snug text-slate-100">
             {d.title}
@@ -147,6 +218,27 @@ export default function App() {
       setSearchQ("");
       setSearchHits([]);
       setSelected(null);
+    } catch (e) {
+      setWatchMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeWatched = async (dramaId) => {
+    if (!credential) return;
+    setWatchMsg("");
+    setBusy(true);
+    try {
+      const data = await apiJson("/api/watch/remove", {
+        credential,
+        drama_id: dramaId,
+      });
+      applyDisplayPayload({
+        watched: data.watched,
+        recommendations: data.recommendations,
+      });
+      setWatchMsg("Removed from watched.");
     } catch (e) {
       setWatchMsg(e.message);
     } finally {
@@ -292,9 +384,11 @@ export default function App() {
             ) : null}
           </div>
 
-          <DramaGrid
+          <WatchedDramaGrid
             items={watched}
             emptyLabel="No watched dramas yet. Search above and add some."
+            disabled={busy}
+            onRemove={removeWatched}
           />
         </section>
 

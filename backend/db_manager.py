@@ -60,21 +60,6 @@ def upd_rec(uid, show):
             opt_rec.append((len(opt_rec) + 1, new_rec[pt_new][1], new_rec[pt_new][2], show))
             pt_new += 1
 
-    seen_drama = set()
-    sqlw = "SELECT id FROM watch_list WHERE google_sub=%s"
-    cursor.execute(sqlw, arg)
-    wl = cursor.fetchall()
-    for x in wl:
-        seen_drama.add(x[0])
-    deduped = []
-    t = 1
-    for _, sim, drama_id, tag in opt_rec:
-        if drama_id in seen_drama:
-            continue
-        deduped.append((t, sim, drama_id, tag))
-        t += 1
-    opt_rec = deduped
-
     rem = "DELETE FROM rec_list WHERE google_sub=%s"
     cursor.execute(rem, arg)
     db.commit()
@@ -85,11 +70,15 @@ def upd_rec(uid, show):
     cursor.executemany(ins, full_push)
     db.commit()
 
-def rem_rec(uid, show):
+def rem_watch(uid, show):
     qry = "DELETE FROM rec_list WHERE google_sub=%s AND tag=%s"
     arg = (uid, show)
     cursor.execute(qry, arg)
     db.commit()
+    qry = "DELETE FROM watch_list WHERE google_sub=%s AND id=%s"
+    cursor.execute(qry, arg)
+    db.commit()
+    return display(uid)
 
 def _dramas_for_ids(id_list):
     if not id_list:
@@ -108,17 +97,21 @@ def display(uid):
     arg = (uid,)
     cursor.execute(watch_items, arg)
     res1 = cursor.fetchall()
+    if len(res1) == 0:
+        qry = "DELETE FROM rec_list"
+        cursor.execute(qry)
     rec_items = (
         "SELECT id FROM rec_list WHERE google_sub=%s AND `rank`<=1000 ORDER BY `rank`"
     )
     cursor.execute(rec_items, arg)
     res2 = cursor.fetchall()
     watch_ids = [x[0] for x in res1]
+    search_watch = set(watch_ids)
     rec_ids = [x[0] for x in res2]
     good_rec = []
     seen_rec = set()
     for rid in rec_ids:
-        if rid in seen_rec:
+        if rid in search_watch or rid in seen_rec:
             continue
         seen_rec.add(rid)
         good_rec.append(rid)
@@ -134,15 +127,6 @@ def add_watch(uid, show):
     cursor.execute(sql, val)
     db.commit()
     upd_rec(uid, show)
-    return display(uid)
-
-
-def rem_watch(uid, show):
-    sql = "DELETE FROM watch_list WHERE google_sub=%s AND id=%s"
-    arg = (uid, show)
-    cursor.execute(sql, arg)
-    db.commit()
-    rem_rec(uid, show)
     return display(uid)
 
 
