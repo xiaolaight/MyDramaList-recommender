@@ -1,4 +1,5 @@
 import os
+import uvicorn
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -9,7 +10,10 @@ from google.oauth2 import id_token
 from mysql.connector import errors as mysql_errors
 from pydantic import BaseModel, Field
 
-import db_manager as db
+try:
+    from . import db_manager as db
+except ImportError:
+    import db_manager as db
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -23,12 +27,15 @@ if not GOOGLE_CLIENT_ID:
 
 app = FastAPI(title="MyDramaList recommender API")
 
+_cors = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173",
+)
+allow_origins = [o.strip() for o in _cors.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -135,3 +142,8 @@ def add_watch(body: WatchBody):
         "watched": rows_to_payload(comp_one),
         "recommendations": rows_to_payload(comp_two),
     }
+
+
+if __name__ == "__main__":
+    # API on 8000 so Vite (5173) can proxy /api here. Run: python app.py from backend/
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)

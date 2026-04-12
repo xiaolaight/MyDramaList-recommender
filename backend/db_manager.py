@@ -28,33 +28,53 @@ def search_drama(srch):
 
 def upd_rec(uid, show):
     sim = "SELECT `rank`, sim_val, rank_id FROM cos_sim WHERE id=%s AND `rank`<=50"
-    arg = (show, )
+    arg = (show,)
     cursor.execute(sim, arg)
     new_rec = cursor.fetchall()
     new_rec.sort()
     oldr = "SELECT `rank`, sim, id, tag FROM rec_list WHERE google_sub=%s"
-    arg = (uid, )
+    arg = (uid,)
     cursor.execute(oldr, arg)
     old_rec = cursor.fetchall()
     old_rec.sort()
-    pt_new = 0
-    pt_old = 0
+
+    # Merge by similarity (higher first). Safe when new_rec or old_rec is empty
+    # (old code indexed new_rec[pt_new] with pt_new < 50 even when new_rec was empty → IndexError → HTTP 500).
     opt_rec = []
-    t = 1
-    while pt_old < len(old_rec) and pt_new < 50:
-        if old_rec[pt_old][1] >= new_rec[pt_new][1]:
-            opt_rec.append((t, old_rec[pt_old][1], old_rec[pt_old][2], old_rec[pt_old][3]))
+    pt_old, pt_new = 0, 0
+    while len(opt_rec) < 50 and (pt_old < len(old_rec) or pt_new < len(new_rec)):
+        if pt_new >= len(new_rec):
+            opt_rec.append(
+                (len(opt_rec) + 1, old_rec[pt_old][1], old_rec[pt_old][2], old_rec[pt_old][3])
+            )
+            pt_old += 1
+        elif pt_old >= len(old_rec):
+            opt_rec.append((len(opt_rec) + 1, new_rec[pt_new][1], new_rec[pt_new][2], show))
+            pt_new += 1
+        elif old_rec[pt_old][1] >= new_rec[pt_new][1]:
+            opt_rec.append(
+                (len(opt_rec) + 1, old_rec[pt_old][1], old_rec[pt_old][2], old_rec[pt_old][3])
+            )
             pt_old += 1
         else:
-            opt_rec.append((t, new_rec[pt_new][1], new_rec[pt_new][2], show))
+            opt_rec.append((len(opt_rec) + 1, new_rec[pt_new][1], new_rec[pt_new][2], show))
             pt_new += 1
+
+    seen_drama = set()
+    sqlw = "SELECT id FROM watch_list WHERE google_sub=%s"
+    cursor.execute(sqlw, arg)
+    wl = cursor.fetchall()
+    for x in wl:
+        seen_drama.add(x[0])
+    deduped = []
+    t = 1
+    for _, sim, drama_id, tag in opt_rec:
+        if drama_id in seen_drama:
+            continue
+        deduped.append((t, sim, drama_id, tag))
         t += 1
-    while pt_old < len(old_rec):
-        opt_rec.append((t, old_rec[pt_old][1], old_rec[pt_old][2], old_rec[pt_old][3]))
-        t += 1
-    while pt_new < 50:
-        opt_rec.append((t, new_rec[pt_new][1], new_rec[pt_new][2], show))
-        t += 1
+    opt_rec = deduped
+
     rem = "DELETE FROM rec_list WHERE google_sub=%s"
     cursor.execute(rem, arg)
     db.commit()
@@ -88,13 +108,24 @@ def display(uid):
     arg = (uid,)
     cursor.execute(watch_items, arg)
     res1 = cursor.fetchall()
-    rec_items = "SELECT id FROM rec_list WHERE google_sub=%s AND `rank`<=50 ORDER BY `rank`"
+    rec_items = (
+        "SELECT id FROM rec_list WHERE google_sub=%s AND `rank`<=1000 ORDER BY `rank`"
+    )
     cursor.execute(rec_items, arg)
     res2 = cursor.fetchall()
     watch_ids = [x[0] for x in res1]
     rec_ids = [x[0] for x in res2]
+    good_rec = []
+    seen_rec = set()
+    for rid in rec_ids:
+        if rid in seen_rec:
+            continue
+        seen_rec.add(rid)
+        good_rec.append(rid)
+        if len(good_rec) >= 50:
+            break
     comp_one = _dramas_for_ids(watch_ids)
-    comp_two = _dramas_for_ids(rec_ids)
+    comp_two = _dramas_for_ids(good_rec)
     return [comp_one, comp_two]
 
 def add_watch(uid, show):

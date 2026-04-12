@@ -41,7 +41,7 @@ CREATE TABLE `rec_list` (
     `sim` DOUBLE NOT NULL,
     `id` INT NOT NULL,
     `tag` INT NOT NULL,
-    PRIMARY KEY (`id`),
+    PRIMARY KEY (`google_sub`, `rank`),
     CONSTRAINT `fk_rec_list_user` FOREIGN KEY (`google_sub`) REFERENCES `app_user` (`google_sub`)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT `fk_rec_list_id` FOREIGN KEY (`id`) REFERENCES `drama` (`id`)
